@@ -40,7 +40,9 @@ templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
 def get_repo():
     cfg = get_settings()
-    return Repository(cfg.db_absolute())
+    return Repository(cfg.get_db_path_or_url())
+
+_GERAR_LIMIT: dict = {}  # ip -> [timestamps]
 
 def sanitize(obj):
     """Converte NaN/Inf e numpy scalars para JSON compliant recursivamente."""
@@ -214,19 +216,31 @@ def api_ml():
     return res
 
 @app.post("/api/gerar")
-def api_gerar(payload: dict):
+def api_gerar(payload: dict, request: Request):
     """
-    Gera jogos com atrito e disclaimer obrigatório.
-    Payload: {estrategia: str, n: int (1..10), seed: int, aceite: bool}
-    Retorna jogos + aviso + prob_teorica fixa + comparação vs random.
-    Nunca promete vantagem.
+    Gera jogos com atrito, 18+ e rate-limit.
+    Payload: {estrategia, n 1..10, seed, aceite, aceite_18, aceite_responsavel}
+    Retorna jogos + custo + prob_teorica fixa + vs_random. Nunca promete vantagem.
     """
+    import time
+    # rate-limit 10 req/min por IP
+    ip = request.client.host if request.client else "unknown"
+    now = time.time()
+    lst = _GERAR_LIMIT.get(ip, [])
+    lst = [t for t in lst if now - t < 60]
+    if len(lst) >= 10:
+        return JSONResponse({"error": "Rate limit: máx 10 gerações/min. Aguarde."}, status_code=429)
+    lst.append(now)
+    _GERAR_LIMIT[ip] = lst
+
     estrategia = payload.get("estrategia", "random")
     n = int(payload.get("n", 5))
     seed = int(payload.get("seed", 42))
     aceite = bool(payload.get("aceite", False))
-    if not aceite:
-        return JSONResponse({"error": "Você deve aceitar o aviso: entendo que é experimental, cada bilhete tem 1/100000 (0.001%) e ROI esperado ≈ -1"}, status_code=400)
+    aceite_18 = bool(payload.get("aceite_18", False))
+    aceite_resp = bool(payload.get("aceite_responsavel", False))
+    if not aceite or not aceite_18 or not aceite_resp:
+        return JSONResponse({"error": "Você deve aceitar: (1) entendo que é experimental 0,001% fixo ROI -1, (2) tenho 18+ anos, (3) jogo responsável (CVV 188). Marque as 3 caixas."}, status_code=400)
     if not 1 <= n <= 10:
         return JSONResponse({"error": "n deve ser 1..10"}, status_code=400)
     if estrategia not in ["random","frequency","recency","distribution","combined"]:
@@ -239,6 +253,9 @@ def api_gerar(payload: dict):
     jogos = strat.select(df if not df.empty else pd.DataFrame(), n=n)
     # contexto estatístico
     prob_teorica = TheoreticalProbability.prob_numero_especifico()  # 0.00001
+    cfg = get_settings()
+    custo_total = n * cfg.cost_per_bet
+    perda_esperada = custo_total * (1 - prob_teorica)  # ≈ custo
     # compara estratégia vs random no histórico (se houver dados)
     vs_random = None
     if not df.empty and df["concurso"].nunique() >= 25:
@@ -290,15 +307,19 @@ def api_gerar(payload: dict):
         "prob_teorica_pct": prob_teorica * 100,
         "prob_teorica_fmt": "1 em 100.000 (0,001%)",
         "roi_esperado": -1.0,
+        "custo_total": custo_total,
+        "custo_fmt": f"R$ {custo_total:.2f}",
+        "perda_esperada": perda_esperada,
         "hash_dados": (meta.get("hash_dados") or "—")[:16],
         "periodo": f"{df['data'].min().date()} a {df['data'].max().date()}" if not df.empty and "data" in df else "—",
         "vs_random": vs_random,
-        "aviso": "AVISO: Jogos são ranking EXPERIMENTAL, NÃO probabilidade real. Cada bilhete tem 0,001% independente do histórico. Histórico não altera sorteio se processo for aleatório. ROI esperado ≈ -1 (perda). Backtest 600 concursos p=1.0 sem superioridade vs random. Não foi encontrada evidência de vantagem.",
+        "aviso": "AVISO 18+: Jogos são ranking EXPERIMENTAL, NÃO probabilidade real. Cada bilhete tem 0,001% independente do histórico. Histórico não altera sorteio se processo for aleatório. ROI esperado ≈ -1 (perda). Backtest 600 concursos p=1.0 sem superioridade vs random. Jogue com responsabilidade. CVV 188. Não foi encontrada evidência de vantagem.",
         "regras": [
             "Probabilidade por bilhete: 1/100.000 (fixa)",
             "Ranking ≠ probabilidade",
             "Nenhum padrão sem p<0.05 out-of-sample + BH foi considerado vantagem",
-            "Limite 10 jogos por geração para evitar ilusão de cobertura"
+            "Limite 10 jogos por geração para evitar ilusão de cobertura",
+            "Rate-limit 10/min, custo exibido, 18+ obrigatório"
         ]
     })
 

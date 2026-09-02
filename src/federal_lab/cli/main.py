@@ -19,7 +19,7 @@ def cli():
 @click.option("--db", default=None, help="caminho DB SQLite")
 def fetch(source, filepath, db):
     cfg = get_settings()
-    db_path = Path(db) if db else cfg.db_absolute()
+    db_path = db if db else cfg.get_db_path_or_url()
     repo = Repository(db_path)
     if source == "official":
         ds = OfficialSource(cache_path=filepath)
@@ -47,7 +47,7 @@ def fetch(source, filepath, db):
 @click.option("--db", default=None)
 def validate(db):
     cfg = get_settings()
-    db_path = Path(db) if db else cfg.db_absolute()
+    db_path = db if db else cfg.get_db_path_or_url()
     repo = Repository(db_path)
     concursos = repo.get_concursos()
     rep = Validator.validar_lote(concursos)
@@ -65,7 +65,7 @@ def validate(db):
 def analyze(db, date_from, date_to):
     from federal_lab.statistics import FrequencyAnalyzer, DistributionAnalyzer
     cfg = get_settings()
-    db_path = Path(db) if db else cfg.db_absolute()
+    db_path = db if db else cfg.get_db_path_or_url()
     repo = Repository(db_path)
     df = repo.get_dataframe()
     if df.empty:
@@ -89,7 +89,7 @@ def analyze(db, date_from, date_to):
 def probability_cmd(db):
     from federal_lab.probability import TheoreticalProbability, ProbabilityComparison
     cfg = get_settings()
-    db_path = Path(db) if db else cfg.db_absolute()
+    db_path = db if db else cfg.get_db_path_or_url()
     repo = Repository(db_path)
     df = repo.get_dataframe()
     if df.empty:
@@ -108,13 +108,14 @@ def simulate(strategy, iterations, seed, db):
     from federal_lab.simulation import MonteCarloSimulator
     from federal_lab.strategies import get_strategy
     cfg = get_settings()
-    db_path = Path(db) if db else cfg.db_absolute()
+    db_path = db if db else cfg.get_db_path_or_url()
     repo = Repository(db_path)
     df = repo.get_dataframe()
     sim = MonteCarloSimulator(seed=seed)
     strat = get_strategy(strategy, seed=seed)
     res = sim.simular_estrategia(strat, n_concursos=iterations, df_history=df if not df.empty else None, seed=seed)
     click.echo(f"Estratégia {strategy}: ROI {res['roi']:.4f} taxa acerto {res['taxa_acerto']:.5f} lucro {res['lucro']:.2f}")
+    click.echo("AVISO: ROI simulado com prêmio fictício R$50000. Probabilidade por bilhete 1/100000 (0,001%) fixa. Histórico não altera sorteio. Não prometer lucro.")
 
 @cli.command()
 @click.option("--strategies", default="random,frequency,recency,distribution,combined")
@@ -123,7 +124,7 @@ def backtest(strategies, db):
     from federal_lab.simulation import Backtester, Benchmark
     from federal_lab.strategies import get_strategy
     cfg = get_settings()
-    db_path = Path(db) if db else cfg.db_absolute()
+    db_path = db if db else cfg.get_db_path_or_url()
     repo = Repository(db_path)
     df = repo.get_dataframe()
     if df.empty or df["concurso"].nunique() < 25:
@@ -140,6 +141,7 @@ def backtest(strategies, db):
     tbl = bench.compare_backtests(resultados)
     if not tbl.empty:
         click.echo("\nBenchmark:\n"+tbl.to_string(index=False))
+    click.echo("AVISO: Backtest não garante futuro. Cada bilhete 1/100000. Nenhum padrão sem p<0.05 BH + out-of-sample é vantagem. ROI esperado ≈ -1.")
 
 @cli.command()
 @click.option("--strategies", default="random,frequency,recency,distribution,combined")
@@ -148,7 +150,7 @@ def compare(strategies, db):
     from federal_lab.simulation import Backtester, Benchmark
     from federal_lab.strategies import get_strategy
     cfg = get_settings()
-    db_path = Path(db) if db else cfg.db_absolute()
+    db_path = db if db else cfg.get_db_path_or_url()
     repo = Repository(db_path)
     df = repo.get_dataframe()
     bt = Backtester()
@@ -181,7 +183,7 @@ def report(db, iterations, seed):
     from federal_lab.simulation.overfitting import OverfittingDetector
     from federal_lab.strategies import get_strategy
     cfg = get_settings()
-    db_path = Path(db) if db else cfg.db_absolute()
+    db_path = db if db else cfg.get_db_path_or_url()
     repo = Repository(db_path)
     df = repo.get_dataframe()
     if df.empty:
@@ -358,6 +360,42 @@ def report(db, iterations, seed):
     out = gen.generate(ctx)
     click.echo(f"✓ Relatório gerado em {out}")
     click.echo(f"  Gráficos em {cg.out_dir}/ ({len(list(cg.out_dir.glob('*.png')))} PNGs)")
+
+@cli.command()
+@click.option("--estrategia", default="random", help="random,frequency,recency,distribution,combined")
+@click.option("--n", default=5, type=int, help="Qtd jogos 1..10")
+@click.option("--seed", default=42, type=int)
+@click.option("--aceite", is_flag=True, help="Aceite: entendo que é experimental, 0,001% fixo, ROI -1")
+@click.option("--db", default=None)
+def gerar(estrategia, n, seed, aceite, db):
+    """Gera jogos com atrito e disclaimer obrigatório (18+)."""
+    if not aceite:
+        click.echo("ERRO: Use --aceite para confirmar que entende: cada bilhete 1/100000 (0,001%) fixo, ranking experimental NÃO é probabilidade, ROI esperado -1, sem promessa de lucro. Ex: federal gerar --estrategia random --n 5 --aceite")
+        raise SystemExit(1)
+    if not 1 <= n <= 10:
+        click.echo("n deve ser 1..10")
+        raise SystemExit(1)
+    from federal_lab.strategies import get_strategy
+    from federal_lab.probability.theoretical import TheoreticalProbability
+    cfg = get_settings()
+    repo = Repository(db if db else cfg.get_db_path_or_url())
+    df = repo.get_dataframe()
+    meta = repo.get_metadata() or {}
+    strat = get_strategy(estrategia, seed=seed)
+    jogos = strat.select(df if not df.empty else __import__("pandas").DataFrame(), n=n)
+    prob = TheoreticalProbability.prob_numero_especifico()
+    custo = n * cfg.cost_per_bet
+    click.echo(f"Jogos ({estrategia}, seed {seed}): {', '.join(jogos)}")
+    click.echo(f"Prob teórica por bilhete: 1/100000 (0,001%) | Custo estimado: R$ {custo:.2f} | Perda esperada ≈ R$ {custo:.2f}")
+    click.echo(f"Hash dados: {(meta.get('hash_dados') or '—')[:12]} | Período: {df['data'].min().date() if not df.empty and 'data' in df else '—'}")
+    click.echo("AVISO: Ranking EXPERIMENTAL, não probabilidade real. Histórico não altera sorteio se aleatório. 18+ Jogue com responsabilidade. CVV 188.")
+    # vs random se houver dados
+    if not df.empty and df["concurso"].nunique() >= 25:
+        from federal_lab.simulation import Backtester, Benchmark
+        bt = Backtester(); bench = Benchmark()
+        r1 = bt.run(df, strat); r2 = bt.run(df, get_strategy("random", seed=seed))
+        vs = bench.significancia_vs_baseline(r1, r2)
+        click.echo(f"vs random: p={vs['teste_t_p']:.4f} → {vs['conclusao']}")
 
 @cli.command()
 @click.option("--host", default="127.0.0.1", help="Host")

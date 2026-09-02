@@ -189,9 +189,17 @@ federal report</pre>
           <button id="btnGerar" onclick="runGerar()" class="w-full bg-slate-900 text-white px-4 py-2 rounded text-sm disabled:bg-slate-400" disabled>Gerar (aceite abaixo)</button>
         </div>
       </div>
-      <label class="flex items-start gap-2 mt-3 p-2 bg-slate-100 rounded cursor-pointer">
-        <input type="checkbox" id="gerarAceite" onchange="document.getElementById('btnGerar').disabled=!this.checked; document.getElementById('btnGerar').textContent=this.checked?'Gerar Jogos':'Gerar (aceite abaixo)'" class="mt-1">
+      <label class="flex items-start gap-2 mt-2 p-2 bg-slate-100 rounded cursor-pointer">
+        <input type="checkbox" id="gerarAceite" onchange="checkGerar()" class="mt-1">
         <span class="text-xs"><b>Li e entendo:</b> cada jogo tem 0,001% fixo, ranking ≠ probabilidade, ROI esperado -1, nenhum padrão com p&lt;0.05 out-of-sample + BH foi vantagem. Não vou tratar como garantia de lucro. <a href="/api/report" target="_blank" class="underline">Ver relatório</a></span>
+      </label>
+      <label class="flex items-start gap-2 mt-2 p-2 bg-slate-100 rounded cursor-pointer">
+        <input type="checkbox" id="gerar18" onchange="checkGerar()" class="mt-1">
+        <span class="text-xs"><b>Tenho 18+ anos</b> e entendo que é jogo de azar. Menores não devem jogar. <a href="https://www.gov.br/mj/pt-br" target="_blank" class="underline">Jogo responsável</a></span>
+      </label>
+      <label class="flex items-start gap-2 mt-2 p-2 bg-amber-50 rounded cursor-pointer border border-amber-200">
+        <input type="checkbox" id="gerarResp" onchange="checkGerar()" class="mt-1">
+        <span class="text-xs"><b>Jogo responsável:</b> vou gastar no máximo o que posso perder. Custo será exibido. Se precisar de ajuda, CVV 188 (24h). <a href="https://www.cvv.org.br" target="_blank" class="underline">cvv.org.br</a></span>
       </label>
       <div id="gerarOut" class="mt-4 hidden">
         <div class="border rounded p-3 bg-white">
@@ -281,13 +289,21 @@ async function runBack(){
   document.getElementById('backOut').innerHTML=html;
   new Chart(document.getElementById('chartBack'),{type:'bar',data:{labels:r.benchmark.map(b=>b.estrategia),datasets:[{label:'ROI total',data:r.benchmark.map(b=>b.roi_total)}]},options:{responsive:true}});
 }
+function checkGerar(){
+  const ok = document.getElementById('gerarAceite').checked && document.getElementById('gerar18').checked && document.getElementById('gerarResp').checked;
+  const btn=document.getElementById('btnGerar');
+  btn.disabled=!ok;
+  btn.textContent=ok?'Gerar Jogos':'Gerar (marque as 3 caixas)';
+}
 let _ultimosJogos=[];
 async function runGerar(){
   const payload={
     estrategia: document.getElementById('gerarStrat').value,
     n: parseInt(document.getElementById('gerarN').value),
     seed: parseInt(document.getElementById('gerarSeed').value),
-    aceite: document.getElementById('gerarAceite').checked
+    aceite: document.getElementById('gerarAceite').checked,
+    aceite_18: document.getElementById('gerar18').checked,
+    aceite_responsavel: document.getElementById('gerarResp').checked
   };
   const r=await fetchJSON('/api/gerar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
   const out=document.getElementById('gerarOut');
@@ -298,7 +314,7 @@ async function runGerar(){
   _ultimosJogos=r.jogos;
   document.getElementById('gerarEstrat').textContent=r.estrategia+' (seed '+r.seed+')';
   document.getElementById('gerarJogos').innerHTML=r.jogos.map(j=>`<div class="border rounded p-2 text-center font-mono bg-slate-900 text-white">${j}</div>`).join('');
-  document.getElementById('gerarProb').textContent=r.prob_teorica_fmt+' — cada jogo';
+  document.getElementById('gerarProb').textContent=r.prob_teorica_fmt+' — cada jogo | Custo '+r.custo_fmt+' | Perda esperada R$ '+r.perda_esperada.toFixed(2);
   document.getElementById('gerarHash').textContent=r.hash_dados;
   document.getElementById('gerarPeriodo').textContent=r.periodo;
   document.getElementById('gerarVsRandom').innerHTML=r.vs_random ? `<b>vs random:</b> p=${(r.vs_random.teste_t_p||r.vs_random.p_value||0).toFixed(4)} — ${r.vs_random.conclusao||''}` : 'vs random: sem dados suficientes';

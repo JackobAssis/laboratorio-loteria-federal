@@ -1,15 +1,16 @@
 # Laboratório Estatístico da Loteria Federal
 
-Plataforma experimental reprodutível para análise estatística da **Loteria Federal brasileira** (5 prêmios, bilhetes 00000–99999).
+**Laboratório didático** para demonstrar que, sob hipótese de independência, histórico não altera `1/100000 (0,001%)` por bilhete, medir custo de ilusões (falácia do jogador, overfitting) e fornecer ferramenta de **jogo responsável com atrito** — não um sistema de promessa.
 
-> **Aviso legal:** Se o processo de sorteio for independente e aleatório, o histórico **NÃO** altera a probabilidade matemática básica do próximo sorteio. Nenhum padrão histórico é vantagem real sem teste de significância fora da amostra.
+> **Aviso legal 18+:** Se o sorteio for independente e aleatório, o histórico **NÃO** altera a probabilidade do próximo sorteio. Nenhum padrão sem `p<0.05 out-of-sample + BH` é vantagem. Cada bilhete tem `1/100000` fixo, ROI esperado `≈ -1`. Jogue com responsabilidade. **CVV 188 (24h) • www.cvv.org.br** • `federal gerar --aceite` exige 18+ e 3 caixas de aceite. Uso educacional.
 
-## Princípios
+## Princípios (com harm reduction)
 - Separa probabilidade teórica vs frequência observada.
 - Nunca usa falácia do jogador; atraso ≠ maior chance.
-- Testa H0/H1 com p-value, IC, correção de múltiplos testes (Bonferroni/BH).
-- Evita overfitting: treino/validação/teste temporal + walk-forward.
-- Tudo reproduzível com seed configurável.
+- Testa H0/H1 com p-value, IC, correção múltipla (Bonferroni/BH).
+- Evita overfitting: treino/val/validação/teste temporal + walk-forward + penalidade complexidade.
+- **Jogo responsável:** 18+, atrito 3 caixas (`aceite`, `18+`, `responsável`), rate-limit 10/min, custo `n*5 R$` e perda esperada exibidos, `POST /api/gerar` exige aceite, CLI `federal gerar --aceite`.
+- Tudo reproduzível com `seed` + `hash` + `DATABASE_URL` (SQLite→Postgres).
 
 ## Arquitetura
 `DATA → FEATURES → ESTATÍSTICA → PROBABILIDADE → ESTRATÉGIAS → SIMULAÇÃO → BACKTEST → RELATÓRIO`
@@ -66,10 +67,10 @@ federal web --port 8000  # inicia dashboard
 ```
 
 ## Dados
-- CSV esperado: `concurso,data,posicao,numero,valor,tipo_extracao`
-- Exemplo em `data/raw/federal_exemplo.csv`
-- Banco: `data/database/federal.db` (SQLite, migrável para Postgres)
-- Hash SHA256 detecta alteração histórica.
+- CSV esperado: `concurso,data,posicao,numero,valor,tipo_extracao` — `data/raw/federal_exemplo.csv` (100) e `federal_escala.csv` (600)
+- Banco: `data/database/federal.db` (SQLite) ou `DATABASE_URL=postgresql://...` (Postgres via `psycopg[binary]`, `Repository` detecta e usa `ON CONFLICT`)
+- Hash SHA256 + `coleta_metadata` detecta alteração histórica.
+- Fonte oficial `servicebus.caixa.gov.br` com fallback cache (evita scraping frágil).
 
 ## Metodologia
 Ver `METHODOLOGY.md`, `STATISTICS.md`, `ARCHITECTURE.md`, `LIMITATIONS.md`.
