@@ -26,14 +26,15 @@ from federal_lab.strategies import get_strategy
 BASE = Path(__file__).resolve().parents[3]  # project root
 TEMPLATES_DIR = Path(__file__).parent / "templates"
 STATIC_DIR = Path(__file__).parent / "static"
+STATIC_DIR.mkdir(parents=True, exist_ok=True)
+REPORTS_DIR = BASE / "reports"
+REPORTS_DIR.mkdir(exist_ok=True)
 
 app = FastAPI(title="Federal Lab", version="0.1.0", description="Laboratório Estatístico da Loteria Federal — interface experimental")
 
 # mount static
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 # serve reports PNGs gerados por federal report
-REPORTS_DIR = BASE / "reports"
-REPORTS_DIR.mkdir(exist_ok=True)
 app.mount("/reports", StaticFiles(directory=str(REPORTS_DIR)), name="reports")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
