@@ -213,6 +213,95 @@ def api_ml():
     res = MLEvaluator().avaliar(df)
     return res
 
+@app.post("/api/gerar")
+def api_gerar(payload: dict):
+    """
+    Gera jogos com atrito e disclaimer obrigatório.
+    Payload: {estrategia: str, n: int (1..10), seed: int, aceite: bool}
+    Retorna jogos + aviso + prob_teorica fixa + comparação vs random.
+    Nunca promete vantagem.
+    """
+    estrategia = payload.get("estrategia", "random")
+    n = int(payload.get("n", 5))
+    seed = int(payload.get("seed", 42))
+    aceite = bool(payload.get("aceite", False))
+    if not aceite:
+        return JSONResponse({"error": "Você deve aceitar o aviso: entendo que é experimental, cada bilhete tem 1/100000 (0.001%) e ROI esperado ≈ -1"}, status_code=400)
+    if not 1 <= n <= 10:
+        return JSONResponse({"error": "n deve ser 1..10"}, status_code=400)
+    if estrategia not in ["random","frequency","recency","distribution","combined"]:
+        return JSONResponse({"error": f"estrategia inválida {estrategia}"}, status_code=400)
+    df = get_df()
+    repo = get_repo()
+    meta = repo.get_metadata() or {}
+    # gera
+    strat = get_strategy(estrategia, seed=seed)
+    jogos = strat.select(df if not df.empty else pd.DataFrame(), n=n)
+    # contexto estatístico
+    prob_teorica = TheoreticalProbability.prob_numero_especifico()  # 0.00001
+    # compara estratégia vs random no histórico (se houver dados)
+    vs_random = None
+    if not df.empty and df["concurso"].nunique() >= 25:
+        try:
+            bt = Backtester()
+            bench = Benchmark()
+            r_estr = bt.run(df, strat)
+            r_rand = bt.run(df, get_strategy("random", seed=seed))
+            vs_random = bench.significancia_vs_baseline(r_estr, r_rand)
+            vs_random = sanitize(vs_random)
+        except Exception as e:
+            vs_random = {"erro": str(e)}
+    # ranking experimental (não prob)
+    try:
+        from federal_lab.ranking import Scorer, Ranker
+        scorer = Scorer()
+        # stats históricos para score
+        historico_stats = {}
+        if not df.empty:
+            from collections import Counter
+            freq = Counter("".join(df["numero"].astype(str)))
+            total = sum(freq.values())
+            historico_stats["freq"] = {k: v/total for k,v in freq.items()}
+            historico_stats["media_soma"] = float(df["numero"].apply(lambda x: sum(int(c) for c in str(x))).mean())
+            historico_stats["desvio_soma"] = float(df["numero"].apply(lambda x: sum(int(c) for c in str(x))).std() or 7)
+            # gaps 2d
+            gaps = {}
+            sd = df.sort_values("concurso")
+            ultimo = sd["concurso"].max()
+            term_last = {}
+            for _, row in sd.iterrows():
+                term_last[str(row["numero"])[-2:]] = row["concurso"]
+            for term, last in term_last.items():
+                gaps[term] = int(ultimo - last)
+            historico_stats["gaps"] = gaps
+        ranker = Ranker(scorer)
+        ranking = ranker.rank(jogos, historico_stats)
+        ranking_records = ranking.to_dict(orient="records")
+    except Exception:
+        ranking_records = [{"numero": j, "score": None, "aviso": "ranking experimental"} for j in jogos]
+
+    return sanitize({
+        "jogos": jogos,
+        "ranking": ranking_records,
+        "estrategia": estrategia,
+        "n": n,
+        "seed": seed,
+        "prob_teorica": prob_teorica,
+        "prob_teorica_pct": prob_teorica * 100,
+        "prob_teorica_fmt": "1 em 100.000 (0,001%)",
+        "roi_esperado": -1.0,
+        "hash_dados": (meta.get("hash_dados") or "—")[:16],
+        "periodo": f"{df['data'].min().date()} a {df['data'].max().date()}" if not df.empty and "data" in df else "—",
+        "vs_random": vs_random,
+        "aviso": "AVISO: Jogos são ranking EXPERIMENTAL, NÃO probabilidade real. Cada bilhete tem 0,001% independente do histórico. Histórico não altera sorteio se processo for aleatório. ROI esperado ≈ -1 (perda). Backtest 600 concursos p=1.0 sem superioridade vs random. Não foi encontrada evidência de vantagem.",
+        "regras": [
+            "Probabilidade por bilhete: 1/100.000 (fixa)",
+            "Ranking ≠ probabilidade",
+            "Nenhum padrão sem p<0.05 out-of-sample + BH foi considerado vantagem",
+            "Limite 10 jogos por geração para evitar ilusão de cobertura"
+        ]
+    })
+
 @app.get("/api/report")
 def api_report():
     # gera relatório e retorna markdown

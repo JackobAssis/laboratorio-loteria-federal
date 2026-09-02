@@ -63,6 +63,7 @@ federal report</pre>
   <!-- abas -->
   <div class="flex flex-wrap gap-2 border-b">
     <button data-tab="estat" onclick="showTab('estat')" class="tab-btn bg-slate-900 text-white px-4 py-2 rounded-t text-sm">📊 Estatística</button>
+    <button data-tab="gerar" onclick="showTab('gerar')" class="tab-btn bg-white border px-4 py-2 rounded-t text-sm">🎯 Gerar Jogos</button>
     <button data-tab="tests" onclick="showTab('tests')" class="tab-btn bg-white border px-4 py-2 rounded-t text-sm">🔬 Testes</button>
     <button data-tab="prob" onclick="showTab('prob')" class="tab-btn bg-white border px-4 py-2 rounded-t text-sm">🎯 Probabilidade</button>
     <button data-tab="sim" onclick="showTab('sim')" class="tab-btn bg-white border px-4 py-2 rounded-t text-sm">🎲 Monte Carlo</button>
@@ -157,6 +158,61 @@ federal report</pre>
     </div>
   </section>
 
+  <!-- GERAR JOGOS - com atrito e disclaimer -->
+  <section id="tab-gerar" class="space-y-4">
+    <div class="card border-amber-200 bg-amber-50">
+      <h3 class="font-bold text-amber-900">🎯 Gerar Jogos — Ranking EXPERIMENTAL (não é probabilidade real)</h3>
+      <p class="text-xs text-amber-800 mt-1">Cada bilhete tem <b>1 em 100.000 (0,001%)</b> por prêmio — histórico <b>não altera</b> sorteio se for aleatório. ROI esperado <b>≈ -1 (perda)</b>. Backtest 600 concursos vs random <code>p=1.0</code> sem superioridade. Use como estudo, não como promessa.</p>
+    </div>
+    <div class="card">
+      <div class="grid md:grid-cols-4 gap-3">
+        <div>
+          <label class="text-xs font-semibold">Estratégia</label>
+          <select id="gerarStrat" class="w-full border rounded px-2 py-1 text-sm">
+            <option value="random">random (baseline)</option>
+            <option value="frequency">frequency (quente)</option>
+            <option value="recency">recency (atrasado)</option>
+            <option value="distribution">distribution (soma)</option>
+            <option value="combined">combined</option>
+          </select>
+          <p class="text-xs text-slate-500">random é baseline; outras são experimentais.</p>
+        </div>
+        <div>
+          <label class="text-xs font-semibold">Qtd jogos (1-10)</label>
+          <input id="gerarN" type="number" min="1" max="10" value="5" class="w-full border rounded px-2 py-1 text-sm">
+        </div>
+        <div>
+          <label class="text-xs font-semibold">Seed</label>
+          <input id="gerarSeed" type="number" value="42" class="w-full border rounded px-2 py-1 text-sm">
+        </div>
+        <div class="flex items-end">
+          <button id="btnGerar" onclick="runGerar()" class="w-full bg-slate-900 text-white px-4 py-2 rounded text-sm disabled:bg-slate-400" disabled>Gerar (aceite abaixo)</button>
+        </div>
+      </div>
+      <label class="flex items-start gap-2 mt-3 p-2 bg-slate-100 rounded cursor-pointer">
+        <input type="checkbox" id="gerarAceite" onchange="document.getElementById('btnGerar').disabled=!this.checked; document.getElementById('btnGerar').textContent=this.checked?'Gerar Jogos':'Gerar (aceite abaixo)'" class="mt-1">
+        <span class="text-xs"><b>Li e entendo:</b> cada jogo tem 0,001% fixo, ranking ≠ probabilidade, ROI esperado -1, nenhum padrão com p&lt;0.05 out-of-sample + BH foi vantagem. Não vou tratar como garantia de lucro. <a href="/api/report" target="_blank" class="underline">Ver relatório</a></span>
+      </label>
+      <div id="gerarOut" class="mt-4 hidden">
+        <div class="border rounded p-3 bg-white">
+          <h4 class="font-bold text-sm">Jogos gerados — <span id="gerarEstrat"></span></h4>
+          <div id="gerarJogos" class="grid grid-cols-2 md:grid-cols-5 gap-2 mt-2"></div>
+          <div class="mt-3 p-2 bg-amber-50 border border-amber-200 rounded text-xs">
+            <div><b>Probabilidade teórica por bilhete:</b> <span id="gerarProb"></span> • <b>ROI esperado:</b> -1.00 (perda) • <b>Hash dados:</b> <code id="gerarHash"></code> • <b>Período:</b> <span id="gerarPeriodo"></span></div>
+            <div class="mt-1" id="gerarVsRandom"></div>
+            <div class="mt-1 font-semibold" id="gerarAviso"></div>
+            <ul class="list-disc ml-4 mt-1" id="gerarRegras"></ul>
+          </div>
+          <div class="mt-2 flex gap-2">
+            <button onclick="copiarJogos()" class="bg-slate-900 text-white px-3 py-1 rounded text-xs">📋 Copiar jogos</button>
+            <button onclick="showTab('back')" class="border px-3 py-1 rounded text-xs">Ver backtest</button>
+          </div>
+          <details class="mt-2"><summary class="text-xs cursor-pointer">Ranking experimental (score)</summary><pre id="gerarRanking" class="bg-slate-100 p-2 rounded text-xs overflow-auto max-h-40"></pre></details>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- OVERFITTING -->
   <section id="tab-over" class="hidden space-y-4">
     <div class="grid md:grid-cols-2 gap-4">
@@ -224,6 +280,36 @@ async function runBack(){
   html+='</table><pre class="bg-slate-100 p-2 rounded mt-2 overflow-auto">'+JSON.stringify(r.significancia,null,2)+'</pre>';
   document.getElementById('backOut').innerHTML=html;
   new Chart(document.getElementById('chartBack'),{type:'bar',data:{labels:r.benchmark.map(b=>b.estrategia),datasets:[{label:'ROI total',data:r.benchmark.map(b=>b.roi_total)}]},options:{responsive:true}});
+}
+let _ultimosJogos=[];
+async function runGerar(){
+  const payload={
+    estrategia: document.getElementById('gerarStrat').value,
+    n: parseInt(document.getElementById('gerarN').value),
+    seed: parseInt(document.getElementById('gerarSeed').value),
+    aceite: document.getElementById('gerarAceite').checked
+  };
+  const r=await fetchJSON('/api/gerar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  const out=document.getElementById('gerarOut');
+  if(r.error){
+    alert(r.error);
+    return;
+  }
+  _ultimosJogos=r.jogos;
+  document.getElementById('gerarEstrat').textContent=r.estrategia+' (seed '+r.seed+')';
+  document.getElementById('gerarJogos').innerHTML=r.jogos.map(j=>`<div class="border rounded p-2 text-center font-mono bg-slate-900 text-white">${j}</div>`).join('');
+  document.getElementById('gerarProb').textContent=r.prob_teorica_fmt+' — cada jogo';
+  document.getElementById('gerarHash').textContent=r.hash_dados;
+  document.getElementById('gerarPeriodo').textContent=r.periodo;
+  document.getElementById('gerarVsRandom').innerHTML=r.vs_random ? `<b>vs random:</b> p=${(r.vs_random.teste_t_p||r.vs_random.p_value||0).toFixed(4)} — ${r.vs_random.conclusao||''}` : 'vs random: sem dados suficientes';
+  document.getElementById('gerarAviso').textContent=r.aviso;
+  document.getElementById('gerarRegras').innerHTML=r.regras.map(x=>`<li>${x}</li>`).join('');
+  document.getElementById('gerarRanking').textContent=JSON.stringify(r.ranking,null,2);
+  out.classList.remove('hidden');
+}
+function copiarJogos(){
+  navigator.clipboard.writeText(_ultimosJogos.join(', '));
+  alert('Jogos copiados: '+_ultimosJogos.join(', '));
 }
 async function uploadFile(){
   const inp=document.getElementById('fileInput');

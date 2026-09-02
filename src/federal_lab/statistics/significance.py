@@ -78,9 +78,10 @@ class SignificanceTester:
         if len(gaps) < 10:
             return {"p_value": None, "interpretacao": "amostra pequena (<10 gaps)"}
         arr = np.asarray(gaps, dtype=float)
-        # estima p = 1 / media gaps
-        p_hat = 1 / arr.mean() if arr.mean() != 0 else 0.1
-        # gera amostra geométrica teórica para comparação via KS?
+        # estima p = 1 / media gaps, cap em [0.001,1] (p>1 impossível)
+        mean_gap = arr.mean() if arr.mean() != 0 else 1
+        p_hat_raw = 1 / mean_gap if mean_gap != 0 else 0.1
+        p_hat = float(np.clip(p_hat_raw, 0.001, 1.0))
         # usa kstest contra geom com p_hat
         # scipy geom: pmf(k) = (1-p)^(k-1) * p  k>=1
         try:
@@ -88,7 +89,7 @@ class SignificanceTester:
         except Exception:
             p = None
             stat = None
-        return {"teste": "KS geométrico (atraso)", "H0": "Gaps ~ Geométrica(p)", "p_hat": float(p_hat), "ks_stat": float(stat) if stat else None, "p_value": float(p) if p else None}
+        return {"teste": "KS geométrico (atraso)", "H0": "Gaps ~ Geométrica(p)", "p_hat": float(p_hat), "p_hat_raw": float(p_hat_raw), "ks_stat": float(stat) if stat else None, "p_value": float(p) if p else None}
 
     @staticmethod
     def corrigir_multiplos(p_values: list[float], method: str = "bonferroni") -> list[float]:
