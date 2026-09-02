@@ -4,14 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Federal Lab — Loteria Federal (GitHub Pages)</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css">
 <style>pre{white-space:pre-wrap}</style>
 </head>
 <body class="bg-slate-50 text-slate-800">
 <header class="bg-slate-900 text-white p-6">
   <h1 class="text-2xl font-bold">🎲 Laboratório Estatístico da Loteria Federal</h1>
   <p class="text-sm text-slate-300">Versão estática para GitHub Pages — dados, testes e relatório. API FastAPI roda localmente via <code>federal web</code>.</p>
-  <p class="text-xs mt-2"><a href="https://github.com/JackobAssis/laboratorio-estatistico-loteria-federal" class="underline">Repositório GitHub</a> • <a href="../reports/relatorio.md" class="underline">relatorio.md</a> • <a href="../src/federal_lab/web/templates/dashboard.html" class="underline">dashboard dinâmico</a></p>
+  <p class="text-xs mt-2"><a href="https://github.com/JackobAssis/laboratorio-loteria-federal" class="underline">Repositório GitHub</a> • <a href="./relatorio.md" class="underline">relatorio.md</a> • <a href="https://jackobassis.github.io/laboratorio-loteria-federal/" class="underline">dashboard dinâmico (local: federal web)</a></p>
 </header>
 <main class="max-w-5xl mx-auto p-6 space-y-6">
   <div class="bg-amber-100 border-l-4 border-amber-500 p-4 text-sm">
@@ -23,21 +23,21 @@
     <div class="mt-3 grid md:grid-cols-2 gap-4 text-sm">
       <div>
         <h3 class="font-semibold">Frequência algarismos 0-9</h3>
-        <img src="../reports/freq_algarismos.png" class="rounded border w-full" alt="freq">
+        <img src="./freq_algarismos.png" class="rounded border w-full" alt="freq">
         <p class="text-xs mt-1">Chi2 p=0.30 compatível uniforme (H0 não rejeitada)</p>
       </div>
       <div>
         <h3 class="font-semibold">Heatmap por posição</h3>
-        <img src="../reports/freq_posicao.png" class="rounded border w-full" alt="posicao">
+        <img src="./freq_posicao.png" class="rounded border w-full" alt="posicao">
       </div>
-      <div><h3 class="font-semibold">Finais 1 dígito</h3><img src="../reports/finais_1d.png" class="rounded border w-full"></div>
-      <div><h3 class="font-semibold">Finais 2 dígitos</h3><img src="../reports/finais_2d.png" class="rounded border w-full"></div>
-      <div><h3 class="font-semibold">Soma dígitos</h3><img src="../reports/dist_soma.png" class="rounded border w-full"></div>
-      <div><h3 class="font-semibold">Distribuição números</h3><img src="../reports/dist_numeros.png" class="rounded border w-full"></div>
-      <div><h3 class="font-semibold">Gaps (atraso)</h3><img src="../reports/gaps_hist.png" class="rounded border w-full"><p class="text-xs">H0 gaps ~ Geométrica, p→compatível → atraso ≠ probabilidade</p></div>
-      <div><h3 class="font-semibold">IC Wilson terminação 0</h3><img src="../reports/ic_proporcao.png" class="rounded border w-full"></div>
-      <div><h3 class="font-semibold">ROI benchmark</h3><img src="../reports/roi_benchmark.png" class="rounded border w-full"><p class="text-xs">random 2.44 vs frequency 2.44 p=1.0 sem superioridade</p></div>
-      <div><h3 class="font-semibold">ROI acumulado</h3><img src="../reports/roi_acumulado.png" class="rounded border w-full"></div>
+      <div><h3 class="font-semibold">Finais 1 dígito</h3><img src="./finais_1d.png" class="rounded border w-full"></div>
+      <div><h3 class="font-semibold">Finais 2 dígitos</h3><img src="./finais_2d.png" class="rounded border w-full"></div>
+      <div><h3 class="font-semibold">Soma dígitos</h3><img src="./dist_soma.png" class="rounded border w-full"></div>
+      <div><h3 class="font-semibold">Distribuição números</h3><img src="./dist_numeros.png" class="rounded border w-full"></div>
+      <div><h3 class="font-semibold">Gaps (atraso)</h3><img src="./gaps_hist.png" class="rounded border w-full"><p class="text-xs">H0 gaps ~ Geométrica, p→compatível → atraso ≠ probabilidade</p></div>
+      <div><h3 class="font-semibold">IC Wilson terminação 0</h3><img src="./ic_proporcao.png" class="rounded border w-full"></div>
+      <div><h3 class="font-semibold">ROI benchmark</h3><img src="./roi_benchmark.png" class="rounded border w-full"><p class="text-xs">random 2.44 vs frequency 2.44 p=1.0 sem superioridade</p></div>
+      <div><h3 class="font-semibold">ROI acumulado</h3><img src="./roi_acumulado.png" class="rounded border w-full"></div>
     </div>
   </section>
   <section class="bg-white rounded-xl shadow p-4">
