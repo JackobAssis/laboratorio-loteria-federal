@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Federal Lab — Loteria Federal (GitHub Pages)</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>pre{white-space:pre-wrap}</style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+<header class="bg-slate-900 text-white p-6">
+  <h1 class="text-2xl font-bold">🎲 Laboratório Estatístico da Loteria Federal</h1>
+  <p class="text-sm text-slate-300">Versão estática para GitHub Pages — dados, testes e relatório. API FastAPI roda localmente via <code>federal web</code>.</p>
+  <p class="text-xs mt-2"><a href="https://github.com/JackobAssis/laboratorio-estatistico-loteria-federal" class="underline">Repositório GitHub</a> • <a href="../reports/relatorio.md" class="underline">relatorio.md</a> • <a href="../src/federal_lab/web/templates/dashboard.html" class="underline">dashboard dinâmico</a></p>
+</header>
+<main class="max-w-5xl mx-auto p-6 space-y-6">
+  <div class="bg-amber-100 border-l-4 border-amber-500 p-4 text-sm">
+    <b>Aviso:</b> Se o sorteio for independente e aleatório, histórico NÃO altera probabilidade do próximo sorteio. Nenhum padrão sem p&lt;0.05 out-of-sample é vantagem real. Interface completa (FastAPI) roda local: <code>pip install -e ".[web]" && federal web --port 8000</code>
+  </div>
+  <section class="bg-white rounded-xl shadow p-4">
+    <h2 class="font-bold">Relatório (600 concursos, 3000 linhas)</h2>
+    <p class="text-xs text-slate-500">Gerado por <code>federal report --iterations 1000 --seed 42</code> • Hash <code>5f9bd0f63d81</code> • 2020-01-04 a 2024-12-05</p>
+    <div class="mt-3 grid md:grid-cols-2 gap-4 text-sm">
+      <div>
+        <h3 class="font-semibold">Frequência algarismos 0-9</h3>
+        <img src="../reports/freq_algarismos.png" class="rounded border w-full" alt="freq">
+        <p class="text-xs mt-1">Chi2 p=0.30 compatível uniforme (H0 não rejeitada)</p>
+      </div>
+      <div>
+        <h3 class="font-semibold">Heatmap por posição</h3>
+        <img src="../reports/freq_posicao.png" class="rounded border w-full" alt="posicao">
+      </div>
+      <div><h3 class="font-semibold">Finais 1 dígito</h3><img src="../reports/finais_1d.png" class="rounded border w-full"></div>
+      <div><h3 class="font-semibold">Finais 2 dígitos</h3><img src="../reports/finais_2d.png" class="rounded border w-full"></div>
+      <div><h3 class="font-semibold">Soma dígitos</h3><img src="../reports/dist_soma.png" class="rounded border w-full"></div>
+      <div><h3 class="font-semibold">Distribuição números</h3><img src="../reports/dist_numeros.png" class="rounded border w-full"></div>
+      <div><h3 class="font-semibold">Gaps (atraso)</h3><img src="../reports/gaps_hist.png" class="rounded border w-full"><p class="text-xs">H0 gaps ~ Geométrica, p→compatível → atraso ≠ probabilidade</p></div>
+      <div><h3 class="font-semibold">IC Wilson terminação 0</h3><img src="../reports/ic_proporcao.png" class="rounded border w-full"></div>
+      <div><h3 class="font-semibold">ROI benchmark</h3><img src="../reports/roi_benchmark.png" class="rounded border w-full"><p class="text-xs">random 2.44 vs frequency 2.44 p=1.0 sem superioridade</p></div>
+      <div><h3 class="font-semibold">ROI acumulado</h3><img src="../reports/roi_acumulado.png" class="rounded border w-full"></div>
+    </div>
+  </section>
+  <section class="bg-white rounded-xl shadow p-4">
+    <h2 class="font-bold">Como rodar local</h2>
+    <pre class="bg-slate-900 text-white p-3 rounded text-xs overflow-auto">pip install -e ".[dev,ml,web]"
+federal fetch --file data/raw/federal_escala.csv
+federal validate
+federal report --iterations 1000 --seed 42
+federal web --port 8000
+# http://127.0.0.1:8000 → dashboard, /docs → OpenAPI</pre>
+  </section>
+  <section class="bg-white rounded-xl shadow p-4">
+    <h2 class="font-bold">Conclusão §22</h2>
+    <blockquote class="border-l-4 pl-4 text-sm"><b>Pergunta:</b> Existe evidência de vantagem sobre aleatório?<br><b>Resposta:</b> NÃO foi encontrada evidência estatística suficiente (p≥0.05 out-of-sample, BH, walk-forward). ML 0.896 vs 0.895 não supera dummy.</blockquote>
+  </section>
+  <footer class="text-center text-xs text-slate-500 py-6">Gerado para GitHub Pages • <code>docs/index.html</code> espelha <code>reports/relatorio.md</code> • FastAPI em <code>src/federal_lab/web/app.py</code></footer>
+</main>
+</body>
+</html>

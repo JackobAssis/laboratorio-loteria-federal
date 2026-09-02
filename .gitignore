@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+*.db
+*.sqlite
+*.sqlite3
+
+# Dados (gerados ignorados, exemplos versionados)
+data/database/*.db
+data/raw/*.csv
+data/raw/*.json
+data/processed/*.parquet
+!data/raw/federal_exemplo.csv
+!data/raw/federal_exemplo.json
+!data/raw/federal_escala.csv
+
+# Reports gerados (html/pdf ignorados, png versionado como exemplo)
+reports/*.html
+reports/*.pdf
+# reports/*.png versionado — whitelist para mostrar exemplo
+!reports/*.png
+
+# Env
+.env
+
+# IDE
+.idea/
+.vscode/
+*.log
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/

@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Federal Lab — Laboratório Estatístico da Loteria Federal</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<link rel="icon" href="data:;base64,iVBORw0KGgo=">
+<style>
+.card{ @apply bg-white rounded-xl shadow p-4; }
+</style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+<header class="bg-slate-900 text-white p-4 sticky top-0 z-10">
+  <div class="max-w-7xl mx-auto flex flex-wrap gap-4 items-center justify-between">
+    <div>
+      <h1 class="text-xl font-bold">🎲 Federal Lab — Loteria Federal</h1>
+      <p class="text-xs text-slate-300">Se o sorteio for aleatório, histórico NÃO altera probabilidade do próximo sorteio. Nenhum padrão sem p&lt;0.05 out-of-sample é vantagem.</p>
+    </div>
+    <div class="flex gap-2">
+      <a href="/docs" target="_blank" class="bg-slate-700 px-3 py-1 rounded text-sm">API Docs</a>
+      <a href="https://github.com/anomalyco/opencode" target="_blank" class="bg-emerald-600 px-3 py-1 rounded text-sm">OpenCode</a>
+    </div>
+  </div>
+</header>
+
+<main class="max-w-7xl mx-auto p-4 space-y-6">
+  <!-- status + upload -->
+  <section class="grid md:grid-cols-3 gap-4">
+    <div class="card md:col-span-2">
+      <h2 class="font-semibold">Status do Banco</h2>
+      <div id="status" class="text-sm mt-2">Carregando…</div>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button onclick="loadAll()" class="bg-slate-900 text-white px-3 py-1 rounded text-sm">🔄 Atualizar</button>
+        <a href="/api/report" target="_blank" class="bg-white border px-3 py-1 rounded text-sm">📄 Ver Markdown</a>
+        <button onclick="document.getElementById('uploadModal').classList.remove('hidden')" class="bg-emerald-600 text-white px-3 py-1 rounded text-sm">📤 Upload CSV/JSON</button>
+      </div>
+    </div>
+    <div class="card">
+      <h3 class="font-semibold text-sm">CLI equivalente</h3>
+      <pre class="bg-slate-900 text-slate-100 p-2 rounded text-xs mt-2 overflow-auto">federal fetch --file data/raw/federal.csv
+federal analyze
+federal simulate --strategy random --iterations 1000
+federal backtest --strategies random,frequency
+federal report</pre>
+    </div>
+  </section>
+
+  <div id="uploadModal" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-20">
+    <div class="bg-white rounded-xl p-6 max-w-md w-full">
+      <h3 class="font-bold">Upload de dados</h3>
+      <p class="text-xs text-slate-500">CSV com colunas concurso,data,posicao,numero,valor,tipo_extracao ou JSON</p>
+      <input type="file" id="fileInput" accept=".csv,.json" class="mt-3 w-full border p-2 rounded text-sm">
+      <div class="mt-3 flex gap-2">
+        <button onclick="uploadFile()" class="bg-emerald-600 text-white px-4 py-1 rounded text-sm">Enviar</button>
+        <button onclick="document.getElementById('uploadModal').classList.add('hidden')" class="border px-4 py-1 rounded text-sm">Fechar</button>
+      </div>
+      <div id="uploadMsg" class="text-xs mt-2"></div>
+    </div>
+  </div>
+
+  <!-- abas -->
+  <div class="flex flex-wrap gap-2 border-b">
+    <button data-tab="estat" onclick="showTab('estat')" class="tab-btn bg-slate-900 text-white px-4 py-2 rounded-t text-sm">📊 Estatística</button>
+    <button data-tab="tests" onclick="showTab('tests')" class="tab-btn bg-white border px-4 py-2 rounded-t text-sm">🔬 Testes</button>
+    <button data-tab="prob" onclick="showTab('prob')" class="tab-btn bg-white border px-4 py-2 rounded-t text-sm">🎯 Probabilidade</button>
+    <button data-tab="sim" onclick="showTab('sim')" class="tab-btn bg-white border px-4 py-2 rounded-t text-sm">🎲 Monte Carlo</button>
+    <button data-tab="back" onclick="showTab('back')" class="tab-btn bg-white border px-4 py-2 rounded-t text-sm">📈 Backtest</button>
+    <button data-tab="over" onclick="showTab('over')" class="tab-btn bg-white border px-4 py-2 rounded-t text-sm">🧪 Overfitting/ML</button>
+  </div>
+
+  <!-- ESTATISTICA -->
+  <section id="tab-estat" class="space-y-4">
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="card">
+        <h3 class="font-semibold">Frequência algarismos 0-9 (esperado 0.10)</h3>
+        <canvas id="chartFreq" height="200"></canvas>
+        <div id="tblFreq" class="text-xs mt-2 overflow-auto max-h-40"></div>
+      </div>
+      <div class="card">
+        <h3 class="font-semibold">Soma dos dígitos (0-45)</h3>
+        <canvas id="chartSoma" height="200"></canvas>
+        <div id="somaStats" class="text-xs mt-2"></div>
+      </div>
+    </div>
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="card">
+        <h3 class="font-semibold">Terminações 1 dígito</h3>
+        <canvas id="chartTerm" height="200"></canvas>
+      </div>
+      <div class="card">
+        <h3 class="font-semibold">Paridade (qtd pares 0-5, binomial p=0.5)</h3>
+        <canvas id="chartPar" height="200"></canvas>
+        <div id="tblPar" class="text-xs mt-2"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3 class="font-semibold">Imagens geradas (reports/*.png)</h3>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2">
+        <img src="/reports/freq_algarismos.png" onerror="this.style.display='none'" class="rounded border">
+        <img src="/reports/dist_soma.png" onerror="this.style.display='none'" class="rounded border">
+        <img src="/reports/freq_posicao.png" onerror="this.style.display='none'" class="rounded border">
+        <img src="/reports/roi_benchmark.png" onerror="this.style.display='none'" class="rounded border">
+        <img src="/reports/gaps_hist.png" onerror="this.style.display='none'" class="rounded border">
+        <img src="/reports/ic_proporcao.png" onerror="this.style.display='none'" class="rounded border">
+      </div>
+      <p class="text-xs text-slate-500 mt-2">Gere com <code>federal report</code>. Servidos em <code>/reports/*.png</code>.</p>
+    </div>
+  </section>
+
+  <!-- TESTES -->
+  <section id="tab-tests" class="hidden space-y-4">
+    <div class="card">
+      <h3 class="font-semibold">Testes de aleatoriedade (H0/H1)</h3>
+      <div id="testsOut" class="text-sm mt-2 space-y-2"></div>
+    </div>
+    <div class="card">
+      <h3 class="font-semibold">Correção múltiplos testes</h3>
+      <div id="corrOut" class="text-xs mt-2"></div>
+    </div>
+  </section>
+
+  <!-- PROB -->
+  <section id="tab-prob" class="hidden space-y-4">
+    <div class="card">
+      <h3 class="font-semibold">Teoria vs empírico — terminação 0 (p=0.10)</h3>
+      <div id="probOut" class="text-sm mt-2"></div>
+      <canvas id="chartProb" height="150"></canvas>
+    </div>
+  </section>
+
+  <!-- SIM -->
+  <section id="tab-sim" class="hidden space-y-4">
+    <div class="card">
+      <h3 class="font-semibold">Simulação Monte Carlo</h3>
+      <div class="flex flex-wrap gap-2 mt-2">
+        <select id="simStrat" class="border rounded px-2 py-1 text-sm"><option>random</option><option>frequency</option><option>recency</option><option>distribution</option><option>combined</option></select>
+        <input id="simIter" type="number" value="1000" class="border rounded px-2 py-1 text-sm w-28">
+        <input id="simSeed" type="number" value="42" class="border rounded px-2 py-1 text-sm w-24">
+        <button onclick="runSim()" class="bg-slate-900 text-white px-4 py-1 rounded text-sm">Simular</button>
+      </div>
+      <div id="simOut" class="text-sm mt-3"></div>
+    </div>
+  </section>
+
+  <!-- BACKTEST -->
+  <section id="tab-back" class="hidden space-y-4">
+    <div class="card">
+      <h3 class="font-semibold">Backtest temporal (sem lookahead)</h3>
+      <div class="flex gap-2 mt-2">
+        <input id="btStrats" value="random,frequency,recency,distribution,combined" class="border rounded px-2 py-1 text-sm flex-1">
+        <button onclick="runBack()" class="bg-slate-900 text-white px-4 py-1 rounded text-sm">Rodar</button>
+      </div>
+      <div id="backOut" class="text-sm mt-3"></div>
+      <canvas id="chartBack" height="200"></canvas>
+    </div>
+  </section>
+
+  <!-- OVERFITTING -->
+  <section id="tab-over" class="hidden space-y-4">
+    <div class="grid md:grid-cols-2 gap-4">
+      <div class="card"><h3 class="font-semibold">Overfitting (split temporal)</h3><div id="overOut" class="text-xs mt-2"></div></div>
+      <div class="card"><h3 class="font-semibold">ML §15 (sem leakage)</h3><div id="mlOut" class="text-xs mt-2"></div></div>
+    </div>
+  </section>
+
+  <footer class="text-center text-xs text-slate-500 py-6 border-t">
+    Laboratório experimental — não prometer lucro. Regra de ouro §22: procurar evidência de que estratégia <b>NÃO</b> funciona. “Não foi encontrada evidência estatística suficiente” é resultado válido.<br>
+    <code>src/federal_lab/web/app.py:1</code> • FastAPI • <code>federal web --port 8000</code> • Streamlit: <code>streamlit run src/federal_lab/web/streamlit_app.py</code>
+  </footer>
+</main>
+
+<script>
+function showTab(name){
+  document.querySelectorAll('[id^=tab-]').forEach(e=>e.classList.add('hidden'));
+  document.getElementById('tab-'+name).classList.remove('hidden');
+  document.querySelectorAll('.tab-btn').forEach(b=>b.className='tab-btn bg-white border px-4 py-2 rounded-t text-sm');
+  document.querySelector(`[data-tab=${name}]`).className='tab-btn bg-slate-900 text-white px-4 py-2 rounded-t text-sm';
+}
+async function fetchJSON(url, opts){ const r=await fetch(url, opts); return r.json(); }
+async function loadAll(){
+  const s=await fetchJSON('/api/status');
+  document.getElementById('status').innerHTML=`<b>Concursos:</b> ${s.concursos} | <b>Linhas:</b> ${s.linhas} | <b>Período:</b> ${s.periodo} | <b>Fonte:</b> ${s.fonte} | <b>Hash:</b> <code>${s.hash}</code>`;
+  // freq
+  const f=await fetchJSON('/api/frequency');
+  if(!f.error){
+    const labels=f.algarismos.map(r=>r.algarismo), vals=f.algarismos.map(r=>r.frequencia);
+    new Chart(document.getElementById('chartFreq'),{type:'bar',data:{labels,datasets:[{label:'freq',data:vals},{label:'esperado',data:Array(10).fill(0.1),type:'line',borderColor:'red'}]},options:{responsive:true}});
+    document.getElementById('tblFreq').innerHTML='<pre class="bg-slate-100 p-2 rounded overflow-auto">'+JSON.stringify(f.algarismos.slice(0,5),null,2)+'</pre>';
+    new Chart(document.getElementById('chartTerm'),{type:'bar',data:{labels:f.terminacoes_1d.map(r=>r.terminacao),datasets:[{label:'terminacoes 1d',data:f.terminacoes_1d.map(r=>r.freq)}]},options:{responsive:true}});
+  }
+  const d=await fetchJSON('/api/distribution');
+  if(!d.error){
+    document.getElementById('somaStats').innerHTML=`Média ${d.soma_stats.media?.toFixed(2)} | Mediana ${d.soma_stats.mediana?.toFixed(2)}`;
+    new Chart(document.getElementById('chartPar'),{type:'bar',data:{labels:d.paridade.map(r=>r.qtd_pares),datasets:[{label:'observado',data:d.paridade.map(r=>r.observado)},{label:'esperado',data:d.paridade.map(r=>r.esperado)}]},options:{responsive:true}});
+  }
+  const t=await fetchJSON('/api/tests');
+  if(!t.error){
+    document.getElementById('testsOut').innerHTML=`<div>Chi2 p=${t.chi2.p_value.toFixed(4)} — ${t.chi2.p_value>=0.05?'compatível aleatório':'rejeita'}</div><div>Runs p=${(t.runs.p_value||0).toFixed(4)}</div><div>Autocorr r=${(t.autocorr.r||0).toFixed(4)} p=${(t.autocorr.p_value||0).toFixed(4)}</div><div>Gap n=${t.gap.n_gaps} p=${(t.gap.test.p_value||0).toFixed(4)}</div>`;
+    document.getElementById('corrOut').innerHTML=`Originais: ${t.correcao.originais.map(v=>v.toFixed(4)).join(', ')}<br>Bonferroni: ${t.correcao.bonferroni.map(v=>v.toFixed(4)).join(', ')}<br>BH: ${t.correcao.bh.map(v=>v.toFixed(4)).join(', ')}`;
+  }
+  const p=await fetchJSON('/api/probability');
+  if(!p.error){
+    document.getElementById('probOut').innerHTML=`k=${p.k} n=${p.n} p_hat=${p.comparacao.p_hat.toFixed(4)} p_teorica=${p.comparacao.p_teorica} p_value=${p.comparacao.p_value.toFixed(4)} → ${p.comparacao.conclusao}`;
+  }
+  // over/ml
+  const o=await fetchJSON('/api/overfitting');
+  if(!o.error) document.getElementById('overOut').innerHTML=`<pre class="bg-slate-100 p-2 rounded text-xs overflow-auto">${JSON.stringify(o,null,2)}</pre>`;
+  const m=await fetchJSON('/api/ml');
+  document.getElementById('mlOut').innerHTML=`<pre class="bg-slate-100 p-2 rounded text-xs overflow-auto">${JSON.stringify(m,null,2)}</pre>`;
+}
+async function runSim(){
+  const payload={strategy:document.getElementById('simStrat').value, iterations:parseInt(document.getElementById('simIter').value), seed:parseInt(document.getElementById('simSeed').value)};
+  const r=await fetchJSON('/api/simulate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  document.getElementById('simOut').innerHTML=`<pre class="bg-slate-900 text-white p-2 rounded text-xs">${JSON.stringify(r,null,2)}</pre>`;
+}
+async function runBack(){
+  const strats=document.getElementById('btStrats').value;
+  const r=await fetchJSON('/api/backtest',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({strategies:strats})});
+  if(r.error){ document.getElementById('backOut').innerHTML=r.error; return; }
+  let html='<table class="w-full text-xs border mt-2"><tr class="bg-slate-100"><th>estratégia</th><th>n</th><th>roi_total</th><th>taxa_acerto</th></tr>';
+  r.benchmark.forEach(b=> html+=`<tr class="border-t"><td>${b.estrategia}</td><td>${b.n_testes}</td><td>${b.roi_total.toFixed(4)}</td><td>${b.taxa_acerto.toFixed(4)}</td></tr>`);
+  html+='</table><pre class="bg-slate-100 p-2 rounded mt-2 overflow-auto">'+JSON.stringify(r.significancia,null,2)+'</pre>';
+  document.getElementById('backOut').innerHTML=html;
+  new Chart(document.getElementById('chartBack'),{type:'bar',data:{labels:r.benchmark.map(b=>b.estrategia),datasets:[{label:'ROI total',data:r.benchmark.map(b=>b.roi_total)}]},options:{responsive:true}});
+}
+async function uploadFile(){
+  const inp=document.getElementById('fileInput');
+  if(!inp.files[0]) return;
+  const fd=new FormData(); fd.append('file', inp.files[0]);
+  const r=await fetch('/api/upload',{method:'POST',body:fd}); const j=await r.json();
+  document.getElementById('uploadMsg').textContent= j.ok ? `✓ ${j.concursos} concursos hash ${j.hash}` : `Erro: ${JSON.stringify(j.error)}`;
+  if(j.ok) loadAll();
+}
+loadAll();
+</script>
+</body>
+</html>
